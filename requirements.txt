@@ -1,0 +1,10 @@
+pdfplumber
+pymupdf
+reportlab
+torch
+torchvision
+transformers
+pillow
+sentencepiece
+accelerate
+einops
