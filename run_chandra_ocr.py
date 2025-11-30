@@ -2,6 +2,7 @@
 run_chandra_ocr.py
 OCR and Form Field Extraction using Chandra model (https://huggingface.co/datalab-to/chandra)
 Supports both PDF and Image inputs.
+Requires CUDA GPU with sufficient VRAM (~20GB for 9B model).
 """
 
 import os
@@ -29,17 +30,23 @@ def pdf_to_images(pdf_path, dpi=150):
 def main():
     print(f"Loading model: {MODEL_NAME}...")
     
-    # Force CPU
-    device = "cpu"
-    print(f"Using device: {device}")
+    # Device selection - prioritize CUDA
+    if torch.cuda.is_available():
+        device = "cuda"
+        dtype = torch.bfloat16  # Use bfloat16 for efficiency on CUDA
+        print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
+    else:
+        device = "cpu"
+        dtype = torch.float32
+        print("CUDA not available, using CPU (will be slow)")
     
     # Load model
     model = AutoModel.from_pretrained(
         MODEL_NAME, 
         trust_remote_code=True,
-        torch_dtype=torch.float32,
+        torch_dtype=dtype,
         low_cpu_mem_usage=True,
-        device_map=device  # Force CPU
+        device_map=device
     )
     
     processor = AutoProcessor.from_pretrained(MODEL_NAME, trust_remote_code=True)
@@ -55,7 +62,6 @@ def main():
         
         try:
             # Prepare input using processor
-            # Chandra uses a specific prompt format
             prompt = "Extract the text content from this document image, preserving the layout."
             
             # Process image
@@ -68,7 +74,7 @@ def main():
             # Move to device
             inputs = {k: v.to(device) if hasattr(v, 'to') else v for k, v in inputs.items()}
             
-            print("Generating (this may take several minutes on CPU)...")
+            print("Generating...")
             
             # Generate
             with torch.no_grad():
